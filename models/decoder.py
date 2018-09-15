@@ -14,4 +14,9 @@ class Decoder_(nn.Module):
         ...
 
     def forward(self, hidden_state=None):
+        """
+
+        :param hidden_state:
+        :return:
+        """
         ...

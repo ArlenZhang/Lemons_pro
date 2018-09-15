@@ -38,11 +38,12 @@ class Trainer:
         loss_ = 0.
         for epoch in range(EPOCH_ALL):
             random.shuffle(self.train_dt)
-            for doc_ids, labels in self.train_dt:
+            for document in self.train_dt:
                 iter_count += 1
-                doc_score = self.model(doc_ids)
+                doc_score = self.model(document)
                 batch_scores = doc_score if batch_scores is None else torch.cat((batch_scores, doc_score), 0)
-                batch_labels = labels if batch_labels is None else torch.cat((batch_labels, labels), 0)
+                batch_labels = document.title_word_ids if batch_labels is None else \
+                    torch.cat((batch_labels, document.title_word_ids), 0)
                 loss_ += criterion(batch_scores, torch.Tensor(batch_labels).long())
                 if iter_count % BATCH_SIZE == 0 and iter_count > 0:
                     batch_count += 1

@@ -26,11 +26,12 @@ if __name__ == "__main__":
         test_desc = argv[1]
     else:
         test_desc = "no message."
-    safe_mkdirs([])
+    safe_mkdirs([TRAIN_documents, DEV_documents])
+    prepare_data()
 
     # 加载数据
-    train_dt = load_data(TRAIN_IDS_tuple)
-    dev_dt = load_data(DEV_IDS)
+    train_dt = load_data(TRAIN_documents)
+    dev_dt = load_data(DEV_documents)
 
     # trainer train
     trainer = Trainer(train_dt, dev_dt)
