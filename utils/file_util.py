@@ -82,9 +82,13 @@ def write_iterate(ite, file_path):
 
 
 # txt append
-def write_append(txt, file_path):
-    with open(file_path, "a") as f:
-        f.write(txt + "\n")
+def write_append(txt, file_path, type_="append"):
+    if type_ == "append":
+        with open(file_path, "a") as f:
+            f.write(txt + "\n")
+    else:
+        with open(file_path, "w") as f:
+            f.write(txt + "\n")
 
 
 def print_(str_, log_file):
