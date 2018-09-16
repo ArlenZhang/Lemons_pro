@@ -51,6 +51,7 @@ def build_voc():
                                     word_ids += 1
                                     tmp_line_ids.append(word2ids[tok])
                             tmp_document.text_word_ids = tmp_line_ids
+                            tmp_document.text_tokens = doc_tokens
                         except Exception:
                             print(line)
                             print("line_number: ", count_line)
@@ -71,6 +72,7 @@ def build_voc():
                                         word_ids += 1
                                         tmp_title_ids.append(word2ids[tok])
                                 tmp_document.title_word_ids = tmp_title_ids
+                                tmp_document.title_tokens = title_tokens
                             except Exception:
                                 print(line)
                                 print("line_number: ", count_line)
