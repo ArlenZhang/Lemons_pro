@@ -64,7 +64,12 @@ class Lemon_Model(nn.Module):
         decoded_output = None
         state_x_ = encode_h
         for idx in range(title_len):
-            tmp_dist_emb = self.dist_embed(title_len - (idx + 1))  # 这个值对于学习结束符很有帮助
+            # 分析：
+            #     这里需要根据距离差作为特征学习解码结束的标签位置。分析为什么不适用title_len而是使用MaxLen作
+            #     为学习的距离目标。如果使用title_len那么模型将大比分看中dist==0的情况，而学不到差距越小越要
+            #     结束这样的特性。使用Max_Len抓住了数据本身分布的特性，将大部分结束都控制在正态分布觉得最合理
+            #     的距离差范围内。
+            tmp_dist_emb = self.dist_embed(MAX_TITLE_LENGTH - (idx + 1))  # 这个值对于学习结束符很有帮助
             title_embed_ = title_embed[idx]
             input_embed = torch.cat((title_embed_, tmp_dist_emb), 1)  # 需要将标题单词向量和距离信息再做拼接
             output, state_x_ = self.decoder_(input_embed, state_x_)
