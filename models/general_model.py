@@ -13,13 +13,14 @@ from models.decoder import Decoder_
 
 
 class Lemon_Model(nn.Module):
-    def __init__(self, word_len=None, pos_len=None, ent_len=None):
+    def __init__(self):
         super(Lemon_Model, self).__init__()
         self.encoder_ = Encoder_()
         self.decoder_ = Decoder_()
-        self.word_embed = nn.Embedding(word_len, EMBED_SIZE)
-        self.pos_embed = nn.Embedding(pos_len, POS_EMB_SIZE)
-        self.ent_embed = nn.Embedding(ent_len, ENT_EMB_SIZE)
+        self.word_embed = nn.Embedding(WORD_LEN, EMBED_SIZE)
+        self.pos_embed = nn.Embedding(POS_LEN, POS_EMB_SIZE)
+        self.ent_embed = nn.Embedding(ENT_LEN, ENT_EMB_SIZE)
+        self.dist_embed = nn.Embedding(DIST_LEN, DIST_EMB_SIZE)
         self.wordemb.requires_grad = True
         self.pos_embed.requires_grad = True
         self.ent_embed.requires_grad = True
@@ -38,7 +39,8 @@ class Lemon_Model(nn.Module):
         :param document:
         :return:
         """
-        return self.word_embed(document.title_word_ids)
+        return self.word_embed(document.title_word_ids), self.pos_embed(document.title_pos_ids), self.ent_embed(
+            document.title_ent_ids)
 
     def score_(self, output, gold_emb):
         return output, gold_emb
@@ -51,18 +53,21 @@ class Lemon_Model(nn.Module):
         input(doc_rep.size())
         return self.encoder_(doc_rep)
 
-    def decode(self, encode_h, title_embed):
+    def decode(self, encode_h, title_embed, title_len):
         """
         对ct逐个解码得到标题的过程
+        :param title_len:
         :param title_embed:
         :param encode_h:
         :return:
         """
         decoded_output = None
         state_x_ = encode_h
-        for idx in range(TITLE_LENGTH):
+        for idx in range(title_len):
+            tmp_dist_emb = self.dist_embed(title_len - (idx + 1))  # 这个值对于学习结束符很有帮助
             title_embed_ = title_embed[idx]
-            output, state_x_ = self.decoder_(title_embed_, state_x_)
+            input_embed = torch.cat((title_embed_, tmp_dist_emb), 1)  # 需要将标题单词向量和距离信息再做拼接
+            output, state_x_ = self.decoder_(input_embed, state_x_)
             decoded_output = output if decoded_output is None else torch.cat((decoded_output, output), 0)
         score_out = self.score_(decoded_output, title_embed)
         return score_out
@@ -73,7 +78,8 @@ class Lemon_Model(nn.Module):
         :return:
         """
         word_embed, pos_embed, ent_embed = self.get_embedding_reps(document=document)
-        title_embed = self.get_title_embedding_reps(document=document)
+        title_word_embed, title_pos_embed, title_ent_embed = self.get_title_embedding_reps(document=document)
+        title_rep = torch.cat((title_word_embed, title_pos_embed, title_ent_embed), 0)
         encode_h = self.encode(word_embed, pos_embed, ent_embed)
         input(encode_h.size())
-        return self.decode(encode_h, title_embed)
+        return self.decode(encode_h, title_rep, len(document.title_word_ids))

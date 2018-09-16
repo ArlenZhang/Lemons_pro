@@ -17,9 +17,8 @@ class Decoder_(nn.Module):
 
     def forward(self, input_=None, state_x=None):
         """
-
-        :param state_x: (80, 1000)
-        :param input_: 目标端句子 (80, 620)
+        :param state_x:
+        :param input_:
         :return:
         """
         hidden_x_, cell_x_ = self.lstm(input_, state_x)  # input_为目标端句子向量表示，state_x初始为编码端的输出，随后迭代
