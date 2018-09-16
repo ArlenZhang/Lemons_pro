@@ -8,10 +8,8 @@
 import json
 from config import *
 from utils.file_util import *
+from utils.text_util import get_sent_words_syns
 from models.doc_struct import Document
-from stanfordcorenlp import StanfordCoreNLP
-
-nlp = StanfordCoreNLP(STANFORD_JAR)
 
 
 def build_voc():
@@ -32,7 +30,8 @@ def build_voc():
     for dir_name in data_list:
         for file_name in os.listdir(dir_name):
             tmp_documents_list = []
-            if file_name.endswith("2.txt"):
+            if file_name.endswith(".txt"):  # 1, 4, 5, 6, 有问题
+                print("当前处理文件名：", file_name)
                 file_path = os.path.join(dir_name, file_name)
                 with open(file_path, "r") as f:
                     for line in f:
@@ -41,7 +40,7 @@ def build_voc():
                         try:
                             tmp_line_ids = []
                             # 对文档内容的token统计
-                            doc_tokens = nlp.word_tokenize(json.loads(line.strip())["content"])
+                            doc_tokens = get_sent_words_syns(json.loads(line.strip())["content"])
                             for tok in doc_tokens:
                                 if tok in word2ids.keys():
                                     word_freq[tok] += 1
@@ -56,11 +55,12 @@ def build_voc():
                             print(line)
                             print("line_number: ", count_line)
                             input("content error!")
+                            exit()
                         if dir_name != DEV_RAW:
                             try:
                                 tmp_title_ids = []
                                 # 对标题的token统计
-                                title_tokens = nlp.word_tokenize(json.loads(line.strip())["title"])
+                                title_tokens = get_sent_words_syns(json.loads(line.strip())["title"])
                                 for tok in title_tokens:
                                     if tok in word2ids.keys():
                                         word_freq[tok] += 1
@@ -76,6 +76,7 @@ def build_voc():
                                 print("line_number: ", count_line)
                                 print("title error!")
                                 input(line)
+                                exit()
                         tmp_documents_list.append(tmp_document)
                 # 累积存储
                 save_data((word2ids, word_ids), WORD2IDS)
