@@ -11,10 +11,11 @@ STANFORD_JAR = r'stanford-corenlp-full-2018-02-27'
 # data path
 TRAIN_RAW = "data/data_raw/TRAINING"
 DEV_RAW = "data/data_raw/DEV"
-
 TRAIN_documents = "data/data_documents/TRAINING"
 DEV_documents = "data/data_documents/DEV"
-
+WORD2IDS = "data/word2ids.pkl"
+SENT_NUM_FREQ = "data/data_documents/sent_num_freq.pkl"
+SENT_LEN_FREQ = "data/data_documents/sent_len_freq.pkl"
 TRAIN_loss_path = "data/train_loss_distribution.pkl"
 
 # 词参数
@@ -28,8 +29,14 @@ DIST_EMB_SIZE = 10
 DIST_LEN = 30
 UNK = "<UNK>"
 PAD = "<PAD>"
-WORD2IDS = "data/word2ids.pkl"
-WORD_FREQ = "data/word2freq.pkl"
+UNK_ID = 0
+PAD_ID = 1
+
+# PAD 参数
+MAX_TITLE_LENGTH = 20
+MAX_SENT_LENGTH = 20  # 根据统计得到
+MAX_SENT_NUMBER = 20  # 根据统计得到
+
 
 # 神经网络参数
 LR = 0.003
@@ -40,5 +47,7 @@ RANDOM_SEED = 2
 HIDDEN_SIZE = 1024
 
 DECODE_OUT_SIZE = 200
-MAX_TITLE_LENGTH = 20
+
+# Model2Save
+Pretrained_model = "data/pre_trained_model.pth"
 

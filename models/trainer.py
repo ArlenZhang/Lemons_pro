@@ -12,12 +12,14 @@ import random
 from config import *
 from utils.file_util import *
 from models.general_model import Lemon_Model
+from utils.data_iterator import data_iterator
 
 
 class Trainer:
-    def __init__(self, train_dt=None, dev_dt=None):
-        self.train_dt = train_dt
-        self.dev_dt = dev_dt
+    def __init__(self):
+        self.data_iterator_ = data_iterator()
+        self.train_dt = self.data_iterator_.next_train_batch()
+        self.dev_dt = ...
         self.model = Lemon_Model()
         self.log_file = ...
 
@@ -26,7 +28,6 @@ class Trainer:
         训练指定轮数之后评测出结果提交平台
         :return:
         """
-        random.seed(RANDOM_SEED)  # 保证别人再次跑的时候有相同的效果
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.Adam(self.model.parameters(), lr=LR, weight_decay=L2_penalty)
         optimizer.zero_grad()
@@ -37,32 +38,43 @@ class Trainer:
         batch_count = 0
         loss_ = 0.
         for epoch in range(EPOCH_ALL):
-            random.shuffle(self.train_dt)
-            for document in self.train_dt:
-                iter_count += 1
-                doc_score = self.model(document)
-                batch_scores = doc_score if batch_scores is None else torch.cat((batch_scores, doc_score), 0)
-                batch_labels = document.title_word_ids if batch_labels is None else \
-                    torch.cat((batch_labels, document.title_word_ids), 0)
-                loss_ += criterion(batch_scores, torch.Tensor(batch_labels).long())
-                if iter_count % BATCH_SIZE == 0 and iter_count > 0:
-                    batch_count += 1
-                    # compute the grads of the loss function according to this batch of data
-                    optimizer.zero_grad()
-                    # Margin loss
-                    loss_.backward(retain_graph=True)  # retain_graph=True
-                    optimizer.step()
-                    optimizer.zero_grad()
-                    loss_of_batch = loss_.data.item() / BATCH_SIZE
-                    loss_str = "the train loss_tran is: " + str(loss_of_batch)
-                    print_(loss_str, self.log_file)
-                    # loss分布分析
-                    loss_distribution.append(loss_of_batch)
-                    loss_ = 0.
+            try:
+                while True:
+                    # 数据迭代
+                    all_ids = next(self.train_dt)
+                    _, _, _, title_word_batch, _, _ = all_ids
+                    iter_count += 1
+                    doc_score = self.model(all_ids)
+
+                    batch_scores = doc_score if batch_scores is None else torch.cat((batch_scores, doc_score), 0)
+                    batch_labels = title_word_batch if batch_labels is None else \
+                        torch.cat((batch_labels, title_word_batch), 0)
+                    loss_ += criterion(batch_scores, torch.Tensor(batch_labels).long())
+                    if iter_count % BATCH_SIZE == 0 and iter_count > 0:
+                        batch_count += 1
+                        # compute the grads of the loss function according to this batch of data
+                        optimizer.zero_grad()
+                        # Margin loss
+                        loss_.backward(retain_graph=True)  # retain_graph=True
+                        optimizer.step()
+                        optimizer.zero_grad()
+                        loss_of_batch = loss_.data.item() / BATCH_SIZE
+                        loss_str = "the train loss_tran is: " + str(loss_of_batch)
+                        print_(loss_str, self.log_file)
+                        # loss分布分析
+                        loss_distribution.append(loss_of_batch)
+                        loss_ = 0.
+            except Exception:
+                input("一次迭代结束，打乱数据新一轮迭代")
+                iter_count = 0
+                self.data_iterator_.shuffle_all()
+
         self.do_eval()
         self.report()
         # loss 存储
         save_data(loss_distribution, TRAIN_loss_path)
+        # model 存储
+        torch.save(self.model.state_dict(), Pretrained_model)
 
     def do_eval(self):
         random.shuffle(self.dev_dt)
