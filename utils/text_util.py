@@ -179,6 +179,8 @@ def get_word_syns(token):
             token_list.append(token[char_last_idx + 1])
             char_last_idx += 1
     token_list_final = []
+
+    end_re = r"^.*\..*$"
     for token_ in token_list:
         if token_.endswith("'s") or token_.endswith("'m") or token_.endswith("'S") or token_.endswith("'d"):
             token_list_final.append(token_[:-2])
@@ -189,6 +191,13 @@ def get_word_syns(token):
         elif token_ == "cannot":
             token_list_final.append("can")
             token_list_final.append("not")
+        elif re.search(end_re, token) is not None:
+            # 对内部句号切割
+            idx = 0
+            while token[idx] != ".":
+                idx += 1
+            token_list_final.append(token[:idx + 1])
+            token_list_final.append(token[idx + 1:])
         else:
             token_list_final.append(token_)
     return token_list_final

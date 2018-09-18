@@ -25,35 +25,33 @@ class Lemon_Model(nn.Module):
         self.pos_embed.requires_grad = True
         self.ent_embed.requires_grad = True
 
+    def sent2vec(self, text_word, text_pos, text_ent):
+        """
+        输入一个篇章的三类数据的位置信息
+        掉用pca方案对句子进行编码，返回一个篇章所有句子的embedding
+        :return:
+        """
+        return 1
+
     def get_text_embedding_reps(self, text_ids):
         """
-        从document对象中获取词，pos,ent等ids信息并转embedding表示返回
-        :param text_ids: 一批数据的合集
-        :return:
-        """
-        text_word_ids, text_pos_ids, text_ent_ids = text_ids
-        return self.word_embed(text_word_ids), self.pos_embed(text_pos_ids), self.ent_embed(text_ent_ids)
 
-    def get_title_embedding_reps(self, title_ids):
+        :param text_ids: 一批数据的合集 (batch_size, sent_num, sent_len)
+        :return: batch_sent_list (batch_size, sent_num, sent_embedding_size)
         """
-        获取标题embedding
-        :param title_ids:
-        :return:
-        """
-        title_word_ids, title_pos_ids, title_ent_ids = title_ids
-        return self.word_embed(title_word_ids), self.pos_embed(title_pos_ids), self.ent_embed(title_ent_ids)
+        batch_sent_list = []
+        batch_text_word_ids, batch_text_pos_ids, batch_text_ent_ids = text_ids
+        for text_word, text_pos, text_ent in zip(batch_text_word_ids, batch_text_pos_ids, batch_text_ent_ids):
+            sent_list = self.sent2vec(text_word, text_pos, text_ent)
+            batch_sent_list.append(sent_list)
+        return batch_sent_list
 
     @staticmethod
     def score_(output, gold_emb):
         return output, gold_emb
 
-    def encode(self, word_embed, pos_embed, ent_embed):
-        print(word_embed.size())
-        print(pos_embed.size())
-        print(ent_embed.size())
-        doc_rep = torch.cat((word_embed, pos_embed, ent_embed), 0)
-        input(doc_rep.size())
-        return self.encoder_(doc_rep)
+    def encode(self, batch_sent_list):
+        return self.encoder_(batch_sent_list)
 
     def decode(self, encode_h, title_embed):
         """
@@ -70,27 +68,38 @@ class Lemon_Model(nn.Module):
             #     结束这样的特性。使用Max_Len抓住了数据本身分布的特性，将大部分结束都控制在正态分布觉得最合理
             #     的距离差范围内。
             tmp_dist_emb = self.dist_embed(MAX_TITLE_LENGTH - (idx + 1))  # 这个值对于学习结束符有帮助
-            title_embed_ = title_embed[idx]
-            input_embed = torch.cat((title_embed_, tmp_dist_emb), 1)  # 需要将标题单词向量和距离信息再做拼接
+            title_word_embed_ = title_embed[idx]
+            input_embed = torch.cat((title_word_embed_, tmp_dist_emb), 1)  # 需要将标题单词向量和距离信息再做拼接
             output, state_x_ = self.decoder_(input_embed, state_x_)
             # 直接对output进行打分
             score_out = self.score_(output, title_embed[idx])
         return score_out
 
+    def title_generate(self, all_ids_test):
+        """
+        根据input直接生成输出信息
+        all_ids_test : 测试集中的关于文本内容部分的ids情况
+        :return:
+        """
+        text_word_batch, text_pos_batch, text_ent_batch = all_ids_test
+        batch_sent_list = self.get_text_embedding_reps(text_ids=(text_word_batch, text_pos_batch, text_ent_batch))
+        encode_h = self.encode(batch_sent_list)
+        # 这里采用特殊的解码方式进行解码
+        title_list = []
+        return title_list
+
     def forward(self, all_ids):
         """
         模型的编码解码打分结果
-        输入描述：text_word_batch.size() = [batch_size, text_length, ]
+        输入描述：all_ids = [batch_size, sent_num, sent_len]
         :return:
         """
-        text_word_batch, text_pos_batch, text_ent_batch, title_word_batch, title_pos_batch, title_ent_batch = all_ids
-        word_embed, pos_embed, ent_embed = self.get_text_embedding_reps(text_ids=(text_word_batch, text_pos_batch,
-                                                                                  text_ent_batch))
-        title_word_embed, title_pos_embed, title_ent_embed = self.get_title_embedding_reps(
-            title_ids=(title_word_batch, title_pos_batch, title_ent_batch))
-        # shape (batch_size, title_len, embed_size)
-        title_rep = torch.cat((title_word_embed, title_pos_embed, title_ent_embed), 0)
-        # shape (batch_size, document_length, embed_size)
-        encode_h = self.encode(word_embed, pos_embed, ent_embed)
+        text_word_batch, text_pos_batch, text_ent_batch, title_word_batch = all_ids
+        # 下面将(batch_size, sent_num, sent_len) 转成 (batch_size, sent_num, sent_embedding_size)的形式
+        batch_sent_list = self.get_text_embedding_reps(text_ids=(text_word_batch, text_pos_batch, text_ent_batch))
+        # shape (batch_size, hidden_size)
+        encode_h = self.encode(batch_sent_list)
         input(encode_h.size())
-        return self.decode(encode_h, title_rep)
+        # (batch_size, title length, embed_size)
+        title_word_embed = self.word_embed(title_word_batch)
+        return self.decode(encode_h, title_word_embed)

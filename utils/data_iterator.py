@@ -13,12 +13,15 @@ from utils.file_util import *
 class data_iterator:
     def __init__(self):
         # 加载数据
-        self.train_dt = load_data(TRAIN_documents)
+        self.train_file_paths = os.listdir(TRAIN_documents)
+        self.tmp_set_idx = 0
+        self.train_dt = load_data(self.train_file_paths[self.tmp_set_idx])
         self.dev_dt = load_data(DEV_documents)
+        self.test_dt = load_data(TEST_documents)
         # batch
-        self.text_word_ids_batch = self.text_pos_ids_batch = self.text_ent_ids_batch = self.title_word_ids_batch = \
-            self.title_pos_ids_batch = self.title_ent_ids_batch = None
+        self.text_word_ids_batch = self.text_pos_ids_batch = self.text_ent_ids_batch = self.title_word_ids_batch = None
         self.init_batch()
+        self.doc_idx = 0
         random.seed(RANDOM_SEED)
 
     def init_batch(self):
@@ -30,25 +33,23 @@ class data_iterator:
         self.text_pos_ids_batch = []
         self.text_ent_ids_batch = []
         self.title_word_ids_batch = []
-        self.title_pos_ids_batch = []
-        self.title_ent_ids_batch = []
 
-    def shuffle_all(self):
+    def new_epoch(self):
+        # 跟新self.train_dt用的数据集
+        self.tmp_set_idx += 1
+        self.train_dt = load_data(self.train_file_paths[self.tmp_set_idx % TRAIN_SET_NUM])
         random.shuffle(self.train_dt)
-        random.shuffle(self.dev_dt)
+        self.doc_idx = 0
 
     def next_train_document(self):
         """
         返回下一个篇章的相关
         :return:
         """
-        idx = 0
         while True:
-            text_word_ids, text_pos_ids, text_ent_ids, title_word_ids, title_pos_ids, title_ent_ids, \
-                title_tokens = self.train_dt[idx].get_all()
-            idx += 1
-            yield text_word_ids, text_pos_ids, text_ent_ids, title_word_ids, title_pos_ids, title_ent_ids, \
-                title_tokens
+            text_sents_ids, text_sents_pos, text_sents_ent, title_word_ids = self.train_dt[self.doc_idx].get_all()
+            self.doc_idx += 1
+            yield text_sents_ids, text_sents_pos, text_sents_ent, title_word_ids
 
     def next_train_batch(self):
         """
@@ -58,17 +59,47 @@ class data_iterator:
         count = 0
         doc_ite = self.next_train_document()
         while True:
-            text_word_ids, text_pos_ids, text_ent_ids, title_word_ids, title_pos_ids, title_ent_ids, title_tokens = \
-                next(doc_ite)
-            self.text_word_ids_batch.append(text_word_ids)
-            self.text_pos_ids_batch.append(text_pos_ids)
-            self.text_ent_ids_batch.append(text_ent_ids)
+            text_sents_ids, text_sents_pos, text_sents_ent, title_word_ids = next(doc_ite)
+            self.text_word_ids_batch.append(text_sents_ids)
+            self.text_pos_ids_batch.append(text_sents_pos)
+            self.text_ent_ids_batch.append(text_sents_ent)
             self.title_word_ids_batch.append(title_word_ids)
-            self.title_pos_ids_batch.append(title_pos_ids)
-            self.title_ent_ids_batch.append(title_ent_ids)
             count += 1
             if count == BATCH_SIZE:
                 count = 0
-                yield self.text_word_ids_batch, self.text_pos_ids_batch, self.text_ent_ids_batch, \
-                    self.title_word_ids_batch, self.title_pos_ids_batch, self.title_ent_ids_batch
+                yield self.text_word_ids_batch, self.text_pos_ids_batch, \
+                    self.text_ent_ids_batch, self.title_word_ids_batch
                 self.init_batch()
+
+    def get_dev_all(self):
+        """
+        获取7号文件的前1000篇作为开发集
+        :return:
+        """
+        text_word_ids_batch = []
+        text_pos_ids_batch = []
+        text_ent_ids_batch = []
+        title_word_ids_batch = []
+        for idx in range(1000):
+            text_sents_ids, text_sents_pos, text_sents_ent, title_word_ids = \
+                self.dev_dt[idx].get_all()
+            text_word_ids_batch.append(text_sents_ids)
+            text_pos_ids_batch.append(text_sents_pos)
+            text_ent_ids_batch.append(text_sents_ent)
+            title_word_ids_batch.append(title_word_ids)
+        return text_word_ids_batch, text_pos_ids_batch, text_ent_ids_batch, title_word_ids_batch
+
+    def get_test_all(self):
+        """
+        获取dev文件作为测试集
+        :return:
+        """
+        text_word_ids_batch = []
+        text_pos_ids_batch = []
+        text_ent_ids_batch = []
+        for idx in range(1000):
+            text_sents_ids, text_sents_pos, text_sents_ent, _ = self.test_dt[idx].get_all()
+            text_word_ids_batch.append(text_sents_ids)
+            text_pos_ids_batch.append(text_sents_pos)
+            text_ent_ids_batch.append(text_sents_ent)
+        return text_word_ids_batch, text_pos_ids_batch, text_ent_ids_batch

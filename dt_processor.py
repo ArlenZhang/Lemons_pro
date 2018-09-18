@@ -10,7 +10,10 @@ from config import *
 from utils.file_util import *
 from utils.text_util import get_sent_words_syns
 from models.doc_struct import Document
+from stanfordcorenlp import StanfordCoreNLP
 
+path_to_jar = 'stanford-corenlp-full-2018-02-27'
+nlp = StanfordCoreNLP(path_to_jar)
 
 def build_voc():
     """
@@ -50,6 +53,7 @@ def build_voc():
     word2ids_ = low_freq_filter(word_freq, title_word_set)
     save_data(word2ids_, WORD2IDS)
 
+
 def low_freq_filter(word_freq, title_word_set):
     """
     根据统计词频和是否在标题生成最佳的word2ids信息
@@ -57,9 +61,10 @@ def low_freq_filter(word_freq, title_word_set):
     """
     # 词汇库构建
     word2ids_ = dict()
-    word2ids_[UNK] = 0
-    word2ids_[PAD] = 1
-    word_ids = 2
+    word2ids_[UNK] = UNK_ID
+    word2ids_[PAD] = PAD_ID
+    word2ids_[END] = END_ID
+    word_ids = 3
     for word in word_freq.keys():
         if ((word_freq[word]) > 1 or (word in title_word_set)) and (word not in word2ids_.keys()):
             word2ids_[word] = word_ids
@@ -78,19 +83,21 @@ def sent_seg(word2ids_=None):
     # statistic 统计每句话里面的句长信息， 统计每个文章里面的句子数信息
     sent_length_freq = dict()
     sent_num_freq = dict()
-    # doc
-    tmp_sent_ids = []
-    tmp_sent_words = []
-    tmp_sent_ids_list = []
-    tmp_sent_words_list = []
+    title_length_freq = dict()
     for doc_dir in [TRAIN_documents, DEV_documents]:
         for file_name in os.listdir(doc_dir):
             if file_name.endswith("pkl"):
+                print("The temporary seg documents: ", file_name)
                 file_path = os.path.join(doc_dir, file_name)
                 documents = load_data(file_path)
+                document_list = []
                 for document in documents:
-                    for idx in range(len(document.text_tokens)):
-                        token = document.text_tokens[idx]
+                    tmp_sent_ids_list = []
+                    tmp_sent_words_list = []
+                    # 对每句话转id
+                    tmp_sent_ids = []
+                    tmp_sent_words = []
+                    for token in document.text_tokens:
                         token_id = word2ids_[token] if token in word2ids_.keys() else UNK_ID
                         tmp_sent_ids.append(token_id)
                         tmp_sent_words.append(token)
@@ -103,17 +110,28 @@ def sent_seg(word2ids_=None):
                             tmp_sent_words_list.append(tmp_sent_words)
                             tmp_sent_ids = []
                             tmp_sent_words = []
-                    tmp_sent_num = len(tmp_sent_ids_list)
-                    # 统计句子数
-                    sent_num_freq[tmp_sent_num] = sent_num_freq[tmp_sent_num] + 1 \
-                        if tmp_sent_num in sent_num_freq.keys() else 1
                     document.text_sents_ids = tmp_sent_ids_list
                     document.text_sents_tokens = tmp_sent_words_list
-                    tmp_sent_ids_list = []
-                    tmp_sent_words_list = []
-                save_data(documents, file_path)  # 覆盖源文件
+
+                    # 对标题转id
+                    tmp_title_ids = []
+                    for token in document.title_tokens:
+                        token_id = word2ids_[token] if token in word2ids_.keys() else UNK_ID
+                        tmp_title_ids.append(token_id)
+                    tmp_title_ids.append(END_ID)
+                    document.title_word_ids = tmp_title_ids
+                    document_list.append(document)
+                    # 统计
+                    tmp_sent_num = len(tmp_sent_ids_list)
+                    sent_num_freq[tmp_sent_num] = sent_num_freq[tmp_sent_num] + 1 \
+                        if tmp_sent_num in sent_num_freq.keys() else 1
+                    tmp_title_len = len(tmp_title_ids)
+                    title_length_freq[tmp_title_len] = title_length_freq[tmp_title_len] + 1 \
+                        if tmp_title_len in title_length_freq.keys() else 1
+                save_data(document_list, file_path)  # 覆盖源文件
     save_data(sent_length_freq, SENT_LEN_FREQ)
     save_data(sent_num_freq, SENT_NUM_FREQ)
+
 
 def build_full_documents():
     """
@@ -123,6 +141,8 @@ def build_full_documents():
     """
     pos2ids = dict()
     ent2ids = dict()
+    # document 最终
+    document_list = []
     for doc_dir in [TRAIN_documents, DEV_documents]:
         for file_name in os.listdir(doc_dir):
             if file_name.endswith(".pkl"):
@@ -168,11 +188,27 @@ def build_full_documents():
                         tmp_ent_ids_list.append(pad_general)
                         tmp_token_ids_list.append(pad_general)
                         tmp_token_list.append(pad_general)
+                    # 对标题长度的padding
+                    tmp_title_ids = document.title_word_ids
+                    while len(tmp_title_ids) < MAX_TITLE_LENGTH:
+                        tmp_title_ids.append(PAD_ID)
+                    # 集体更新
                     document.text_sents_pos = tmp_pos_ids_list
                     document.text_sents_ent = tmp_ent_ids_list
                     document.text_sents_ids = tmp_token_ids_list
                     document.text_sents_tokens = tmp_token_list
-                save_data(documents, file_path)  # 覆盖存储
+                    document.title_word_ids = tmp_title_ids
+                    document_list.append(document)
+                save_data(document_list, file_path)  # 覆盖存储
+
+
+def test_seg():
+    for file_name in os.listdir(TRAIN_documents):
+        if file_name.endswith(".pkl"):
+            documents = load_data(os.path.join(TRAIN_documents, file_name))
+            for document in documents:
+                print(document.text_sents_tokens)
+                input()
 
 
 def get_pos_ent(sent_tokens):
@@ -181,12 +217,16 @@ def get_pos_ent(sent_tokens):
     :param sent_tokens:
     :return:
     """
-    return [], []
+    sent_str = " ".join(sent_tokens)
+    pos_tags = [pair[1] for pair in nlp.pos_tag(sent_str)]
+    ent_tags = [pair[1] for pair in nlp.ner(sent_str)]
+    return pos_tags, ent_tags
 
 
 if __name__ == "__main__":
-    # build_voc()
-    word2ids = load_data(WORD2IDS)
-    sent_seg(word2ids_=word2ids)
+    build_voc()
+    # word2ids = load_data(WORD2IDS)
+    # sent_seg(word2ids_=word2ids)
     # 创建其他信息，统计词频之后在config中确定padding长度并进行下面的操作
-    build_full_documents()
+    # build_full_documents()
+    # test_seg()

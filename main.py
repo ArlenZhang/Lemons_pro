@@ -26,7 +26,7 @@ if __name__ == "__main__":
         test_desc = argv[1]
     else:
         test_desc = "no message."
-    safe_mkdirs([TRAIN_documents, DEV_documents])
+    safe_mkdirs([TRAIN_documents, DEV_documents, LOD_DIR])
     prepare_data()
 
     # trainer train

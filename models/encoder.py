@@ -22,24 +22,24 @@ class Encoder_(nn.Module):
             nn.Tanh()
         )
 
-    def bilstm_attn_encode(self, doc_rep):
+    def bilstm_attn_encode(self, batch_sent_list):
         """
         对 edu 双向 lstm 进行编码
-        :param doc_rep: (batch_size, document_length, embedding_size)
+        :param batch_sent_list: (batch_size, sent_num, sent_embed_size)
         :return:
         """
-        inputs = doc_rep.permute(1, 0, 2)  # transfer into shape: (seq_len, batch, input_size)
+        inputs = batch_sent_list.permute(1, 0, 2)  # transfer into shape: (seq_len, batch, input_size)
         hs, _ = self.edu_rnn_encoder(inputs)  # hs.size()  (seq_len, batch, hidden_size)
         hs = hs.squeeze()  # size: (seq_len, hidden_size)
         keys = self.edu_attn(hs)  # size: (seq_len, hidden_size)
         attn = nnfunc.softmax(keys.matmul(self.edu_attn_query), 0)
-        output = (hs * attn.view(-1, 1)).sum(0)
+        output = (hs * attn.view(-1, 1)).sum(0)  # (batch_size, hidden_size)
         return output, attn
 
-    def forward(self, doc_rep=None):
+    def forward(self, batch_sent_list=None):
         """
-
-        :param doc_rep: 包含text_embedding, pos, ent的embedding表示 (batch_size, n_words, all_embed_size)
+        对一批篇章的句子表征进行rnn编码
+        :param batch_sent_list: 包含text_embedding, pos, ent的embedding表示 (batch_size, sent_num, sent_embed_size)
         :return:
         """
-        return self.bilstm_attn_encode(doc_rep=doc_rep)
+        return self.bilstm_attn_encode(batch_sent_list=batch_sent_list)
