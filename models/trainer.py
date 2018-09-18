@@ -40,9 +40,11 @@ class Trainer:
                     # all_ids前三个数据项：(batch_size, sent_num, sent_len)
                     all_ids = next(self.train_dt)
                     # 批量数据解码和对应的一批labels直接计算loss并学习
-                    batch_scores = self.model(all_ids)
+                    batch_out = self.model(all_ids)
                     batch_labels = all_ids[3]
-                    loss_ = criterion(batch_scores, batch_labels)
+                    print(batch_labels.size())
+                    input(batch_out.size())
+                    loss_ = criterion(batch_out, batch_labels)
                     optimizer.zero_grad()
                     loss_.backward()
                     optimizer.step()

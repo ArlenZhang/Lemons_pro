@@ -46,10 +46,6 @@ class Lemon_Model(nn.Module):
             batch_sent_list.append(sent_list)
         return batch_sent_list
 
-    @staticmethod
-    def score_(output, gold_emb):
-        return output, gold_emb
-
     def encode(self, batch_sent_list):
         return self.encoder_(batch_sent_list)
 
@@ -60,6 +56,7 @@ class Lemon_Model(nn.Module):
         :param encode_h:
         :return:
         """
+        batch_out = None
         state_x_ = encode_h
         for idx in range(MAX_TITLE_LENGTH):
             # 分析：
@@ -71,9 +68,9 @@ class Lemon_Model(nn.Module):
             title_word_embed_ = title_embed[idx]
             input_embed = torch.cat((title_word_embed_, tmp_dist_emb), 1)  # 需要将标题单词向量和距离信息再做拼接
             output, state_x_ = self.decoder_(input_embed, state_x_)
-            # 直接对output进行打分
-            score_out = self.score_(output, title_embed[idx])
-        return score_out
+            # 对输出进行拼接
+            batch_out = output if batch_out is None else torch.cat((batch_out, output), 1)
+        return batch_out
 
     def title_generate(self, all_ids_test):
         """
@@ -84,7 +81,12 @@ class Lemon_Model(nn.Module):
         text_word_batch, text_pos_batch, text_ent_batch = all_ids_test
         batch_sent_list = self.get_text_embedding_reps(text_ids=(text_word_batch, text_pos_batch, text_ent_batch))
         encode_h = self.encode(batch_sent_list)
-        # 这里采用特殊的解码方式进行解码
+        # 这里采用特殊的解码方式进行解码：初始化一个词ids为pad以词向量信息作为y_0输入，根据encode_h和y_0解码出y_1和h_1一次类推
+        # ，直到最大标题长度为止 rnn使用 self.decoder_.lstm
+        y_0 = ...
+        for idx in MAX_TITLE_LENGTH:
+            ...
+
         title_list = []
         return title_list
 
