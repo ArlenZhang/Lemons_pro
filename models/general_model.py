@@ -24,6 +24,7 @@ class Lemon_Model(nn.Module):
         self.wordemb.requires_grad = True
         self.pos_embed.requires_grad = True
         self.ent_embed.requires_grad = True
+        self.dist_embed.requires_grad = True
 
     def sent2vec(self, text_word, text_pos, text_ent):
         """
@@ -83,12 +84,29 @@ class Lemon_Model(nn.Module):
         encode_h = self.encode(batch_sent_list)
         # 这里采用特殊的解码方式进行解码：初始化一个词ids为pad以词向量信息作为y_0输入，根据encode_h和y_0解码出y_1和h_1一次类推
         # ，直到最大标题长度为止 rnn使用 self.decoder_.lstm
-        y_0 = ...
+        trg_ = torch.zeros((len(text_word_batch), EMBED_SIZE))
+        out_concat = None
         for idx in MAX_TITLE_LENGTH:
-            ...
+            output, state_x = self.decoder(trg_, state_x)
+            output_ids = self.decode2trg_ids(output=output)
+            trg_ = self.word_embed(output_ids)
+            out_concat = torch.unsqueeze(output_ids, 0) if out_concat is None \
+                else torch.cat((out_concat, torch.unsqueeze(output_ids, 0)),
+                               dim=0)
+            if output_ids == END_ID:
+                # 预测到结束符则直接结束
+                return out_concat
+        return out_concat
 
-        title_list = []
-        return title_list
+    def decode2trg_ids(output):
+        """
+        将output概率化（softmax），找到概率最大的词语对应的下标，从而转换为词语的id表示(80,1)
+        :param output: 每一轮lstmcell的输出:（80，30001）  BATCH_SIZE:80, TRG_VOCAB_SIZE:30001
+        :return: BATCH个句子的所有第一个词语的下标
+        """
+        softmax_pro_out = self.softmax(output)
+        trg_ids = torch.max(softmax_pro_out, dim=1)  # 返回一个2元组，[0]为最大概率，[1]为最大概率对应的下标
+        return trg_ids[1]
 
     def forward(self, all_ids):
         """

@@ -6,6 +6,7 @@
 @Description: Deal with training and validation
 """
 import torch
+from rouge import FileRouge
 from config import *
 import torch.nn as nn
 import torch.optim as optim
@@ -21,6 +22,7 @@ class Trainer:
         self.dev_dt = self.data_iterator_.get_dev_all()
         self.test_dt = self.data_iterator_.get_test_all()
         self.model = Lemon_Model()
+        self.ids2word = load_data(IDS2WORD)
         self.log_file = LOG_FILE_PATH
 
     def do_train(self):
@@ -63,6 +65,8 @@ class Trainer:
             except TimeoutError:
                 input("一次迭代结束，打乱数据新一轮迭代")
                 self.data_iterator_.new_epoch()
+        # 最终评测
+        self.do_eval()
         # loss 存储
         save_data(loss_distribution, TRAIN_loss_path)
         # model 存储
@@ -74,21 +78,30 @@ class Trainer:
         :return:
         """
         title_list = self.model.title_generate(self.test_dt)
+        self.write_dev_test(title_list, TEST_OUTPUT_PATH)
         print("请将生成的标题提交至评测平台...")
 
-    @staticmethod
-    def ids2words(doc_score):
-        words_of_title = ""
-        for ids in doc_score:
-            word = ...
-            words_of_title += word + " "
-        return words_of_title
-
-    def get_pre(self, title_list, title_word_ids_batch):
+    def get_pre(self, title_list_out, title_list_gold):
         """
         输入模型预测的结果和标准结果，计算准确率
-        :param title_list:
-        :param title_word_ids_batch:
+        :param title_list_out: (batch_size, title_length)
+        :param title_list_gold: (batch_size, title_length)
         :return:
         """
-        ...
+		# 将得到的结果转成一行一行的形式
+        self.write_dev_test(title_list_out, DEV_OUTPUT_PATH)
+        self.write_dev_test(title_list_gold, DEV_GOLD_PATH)
+        # 调用rouge对两个文件的数据进行
+        files_rouge = FilesRouge(DEV_OUTPUT_PATH, DEV_GOLD_PATH)
+        scores = files_rouge.get_scores(avg=True)
+        print("当前在开发集上的rouge平均准确率：", scores[0]["rouge-1"]["p"])
+
+    def write_dev_test(self, title_list, dist_path):
+        """
+        将生成的数据存储到指定文件
+        """
+        for title_ids in title_list:
+            line_ = ""
+            for word_id in title_ids:
+                line_ += self.ids2word[word_id]
+            write_append(line, dist_path)

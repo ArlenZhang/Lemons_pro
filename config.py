@@ -15,9 +15,13 @@ TRAIN_documents = "data/data_documents/TRAINING"
 DEV_documents = "data/data_documents/DEV/bytecup.corpus.train.7.pkl"
 TEST_documents = "data/data_documents/DEV/bytecup.corpus.validation_set.pkl"
 WORD2IDS = "data/word2ids.pkl"
+IDS2WORD = ""
 SENT_NUM_FREQ = "data/data_documents/sent_num_freq.pkl"
 SENT_LEN_FREQ = "data/data_documents/sent_len_freq.pkl"
 TRAIN_loss_path = "data/train_loss_distribution.pkl"
+DEV_OUTPUT_PATH = "data/dev_out_titles.tsv"
+DEV_GOLD_PATH = "data/dev_gold_titles.tsv"
+TEST_OUTPUT_PATH = "data/test_out_titles.tsv"
 
 # experimental
 SET_VERSION = "1"
